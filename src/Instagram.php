@@ -80,26 +80,25 @@ class Instagram {
    */
   private $_actions = array('follow', 'unfollow', 'block', 'unblock', 'approve', 'deny');
 
-  /**
-   * Rate limit
-   *
-   * @var int
-   */
-  private $_xRateLimitRemaining;
 
-  /**
+  public function test()
+  {
+      return "yes yes";
+  }
+
+    /**
    * Default constructor
    *
    * @param array|string $config          Instagram configuration data
    * @return void
    */
   public function __construct($config) {
-    if (is_array($config)) {
+    if (true === is_array($config)) {
       // if you want to access user data
       $this->setApiKey($config['apiKey']);
       $this->setApiSecret($config['apiSecret']);
       $this->setApiCallback($config['apiCallback']);
-    } else if (is_string($config)) {
+    } else if (true === is_string($config)) {
       // if you only want to access public data
       $this->setApiKey($config);
     } else {
@@ -162,7 +161,7 @@ class Instagram {
    * @return mixed
    */
   public function getUserMedia($id = 'self', $limit = 0) {
-    return $this->_makeCall('users/' . $id . '/media/recent', strlen($this->getAccessToken()), array('count' => $limit));
+    return $this->_makeCall('users/' . $id . '/media/recent', ($id === 'self'), array('count' => $limit));
   }
 
   /**
@@ -208,15 +207,6 @@ class Instagram {
   }
 
   /**
-   * Get the value of X-RateLimit-Remaining header field
-   *
-   * @return integer X-RateLimit-Remaining        API calls left within 1 hour
-   */
-   public function getRateLimit(){
-     return $this->_xRateLimitRemaining;
-   }
-
-  /**
    * Modify the relationship between the current user and the target user
    *
    * @param string $action                Action command (follow/unfollow/block/unblock/approve/deny)
@@ -224,7 +214,7 @@ class Instagram {
    * @return mixed
    */
   public function modifyRelationship($action, $user) {
-    if (in_array($action, $this->_actions) && isset($user)) {
+    if (true === in_array($action, $this->_actions) && isset($user)) {
       return $this->_makeCall('users/' . $user . '/relationship', true, array('action' => $action), 'POST');
     }
     throw new \Exception("Error: modifyRelationship() | This method requires an action command and the target user id.");
@@ -251,7 +241,7 @@ class Instagram {
    * @return mixed
    */
   public function getMedia($id) {
-    return $this->_makeCall('media/' . $id, isset($this->_accesstoken));
+    return $this->_makeCall('media/' . $id);
   }
 
   /**
@@ -396,7 +386,7 @@ class Instagram {
    * @return mixed
    */
   public function pagination($obj, $limit = 0) {
-    if (is_object($obj) && !is_null($obj->pagination)) {
+    if (true === is_object($obj) && !is_null($obj->pagination)) {
       if (!isset($obj->pagination->next_url)) {
         return;
       }
@@ -433,7 +423,7 @@ class Instagram {
     );
 
     $result = $this->_makeOAuthCall($apiData);
-    return !$token ? $result : $result->access_token;
+    return (false === $token) ? $result : $result->access_token;
   }
 
   /**
@@ -446,12 +436,12 @@ class Instagram {
    * @return mixed
    */
   protected function _makeCall($function, $auth = false, $params = null, $method = 'GET') {
-    if (!$auth) {
+    if (false === $auth) {
       // if the call doesn't requires authentication
       $authMethod = '?client_id=' . $this->getApiKey();
     } else {
       // if the call needs an authenticated user
-      if (isset($this->_accesstoken)) {
+      if (true === isset($this->_accesstoken)) {
         $authMethod = '?access_token=' . $this->getAccessToken();
       } else {
         throw new \Exception("Error: _makeCall() | $function - This method requires an authenticated users access token.");
@@ -468,7 +458,7 @@ class Instagram {
 
     // signed header of POST/DELETE requests
     $headerData = array('Accept: application/json');
-    if ($this->_signedheader && 'GET' !== $method) {
+    if (true === $this->_signedheader && 'GET' !== $method) {
       $headerData[] = 'X-Insta-Forwarded-For: ' . $this->_signHeader();
     }
 
@@ -476,7 +466,6 @@ class Instagram {
     curl_setopt($ch, CURLOPT_URL, $apiCall);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headerData);
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 20);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 90);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 
@@ -488,18 +477,7 @@ class Instagram {
     }
 
     $jsonData = curl_exec($ch);
-
-    // split header from JSON data
-    // and assign each to a variable
-    list($headerContent, $jsonData) = explode("\r\n\r\n", $jsonData, 2);
-
-    // convert header content into an array
-    $headers = $this->processHeaders($headerContent);
-
-    // get the 'X-Ratelimit-Remaining' header value
-    $this->_xRateLimitRemaining = $headers['X-Ratelimit-Remaining'];
-
-    if (!$jsonData) {
+    if (false === $jsonData) {
       throw new \Exception("Error: _makeCall() - cURL error: " . curl_error($ch));
     }
     curl_close($ch);
@@ -523,10 +501,9 @@ class Instagram {
     curl_setopt($ch, CURLOPT_HTTPHEADER, array('Accept: application/json'));
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 90);
 
     $jsonData = curl_exec($ch);
-    if (!$jsonData) {
+    if (false === $jsonData) {
       throw new \Exception("Error: _makeOAuthCall() - cURL error: " . curl_error($ch));
     }
     curl_close($ch);
@@ -540,28 +517,9 @@ class Instagram {
    * @return string                       The signed header
    */
   private function _signHeader() {
-    $ipAddress = (isset($_SERVER['SERVER_ADDR'])) ? $_SERVER['SERVER_ADDR'] : gethostbyname(gethostname());
+    $ipAddress = $_SERVER['SERVER_ADDR'];
     $signature = hash_hmac('sha256', $ipAddress, $this->_apisecret, false);
     return join('|', array($ipAddress, $signature));
-  }
-
-  /**
-   * Read and process response header content
-   *
-   * @param array
-   * @return array
-   */
-  private function processHeaders($headerContent){
-    $headers = array();
-    foreach (explode("\r\n", $headerContent) as $i => $line) {
-      if($i===0){
-        $headers['http_code'] = $line;
-      }else{
-        list($key,$value) = explode(':', $line);
-        $headers[$key] = $value;
-      }
-    }
-    return $headers;
   }
 
   /**
@@ -571,7 +529,7 @@ class Instagram {
    * @return void
    */
   public function setAccessToken($data) {
-    (is_object($data)) ? $token = $data->access_token : $token = $data;
+    (true === is_object($data)) ? $token = $data->access_token : $token = $data;
     $this->_accesstoken = $token;
   }
 
@@ -606,7 +564,7 @@ class Instagram {
   /**
    * API Secret Setter
    *
-   * @param string $apiSecret
+   * @param string $apiSecret 
    * @return void
    */
   public function setApiSecret($apiSecret) {
@@ -621,7 +579,7 @@ class Instagram {
   public function getApiSecret() {
     return $this->_apisecret;
   }
-
+  
   /**
    * API Callback URL Setter
    *
